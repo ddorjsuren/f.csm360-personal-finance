@@ -60,9 +60,9 @@ btnRegister.addEventListener('click', async () => {
     const { email, password } = getInputs()
     if (!validateInputs(email, password)) return
 
-    submitBtn.disabled = true
+    btnRegister.disabled = true
     showMessage('Бүртгэж байна...', 'text-muted')
-    await new Promise(r => setTimeout(r, 0))  // let the browser repaint
+    await new Promise(r => setTimeout(r, 0)) 
 
 
     const { data, error } = await supabase.auth.signUp({ email, password })
