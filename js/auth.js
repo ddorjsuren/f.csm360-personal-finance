@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase } from './supabase.js'
 
 const authForm = document.getElementById('auth-form')
 const emailInput = document.getElementById('email')
@@ -38,6 +38,7 @@ authForm.addEventListener('submit', async (e) => {
 
     submitBtn.disabled = true
     showMessage('Нэвтэрч байна...', 'text-muted')
+    await new Promise(r => setTimeout(r, 0))  // let the browser repaint
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
@@ -59,8 +60,10 @@ btnRegister.addEventListener('click', async () => {
     const { email, password } = getInputs()
     if (!validateInputs(email, password)) return
 
-    btnRegister.disabled = true
-    showMessage('Бүртгүүлж байна...', 'text-muted')
+    submitBtn.disabled = true
+    showMessage('Бүртгэж байна...', 'text-muted')
+    await new Promise(r => setTimeout(r, 0))  // let the browser repaint
+
 
     const { data, error } = await supabase.auth.signUp({ email, password })
 
