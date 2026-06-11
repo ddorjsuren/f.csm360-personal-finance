@@ -45,7 +45,7 @@ transactionForm.addEventListener('submit', async(e)=>{
     if (type === 'expense') {
         // Тухайн гүйлгээний огнооноос Жил-Сарыг салгаж авна (Жишээ нь: "2026-06-08" -> "2026-06")
         const currentMonthYear = date.substring(0, 7);
-
+        console.log("The dates checked: "+currentMonthYear);
         // Supabase-ээс энэ сард, энэ ангилалд тогтоосон төсөв байгаа эсэхийг хайх
         const { data: budgetData } = await supabase
             .from('budgets')
@@ -54,19 +54,19 @@ transactionForm.addEventListener('submit', async(e)=>{
             .eq('category', category)
             .eq('month_year', currentMonthYear)
             .maybeSingle(); // Олдвол ганцхан объект авна, олдохгүй бол null
-
+        console.log("Has the budget been found? : "+ budgetData);
         // Хэрэв энэ сард энэ ангилалд зориулсан төсөв олдвол цааш шалгана
         if (budgetData) {
             const limitAmount = budgetData.limit_amount;
 
             // Энэ сард, энэ ангилалд урьд нь хийгдсэн бүх зарлагуудын нийлбэрийг Supabase-с татах
             const { data: pastExpenses } = await supabase
-                .from('transactions')
-                .select('amount')
+                .from('transaction')
+                .select('amount, date')
                 .eq('user_id', user.id)
                 .eq('type', 'expense')
                 .eq('category', category);
-            
+            console.log("retrieved expenses: "+  pastExpenses);
             // Энэ сард хамаарах зарлагуудыг шүүж нийлбэрийг олно
             let totalPastExpense = 0;
             if (pastExpenses) {
@@ -77,7 +77,7 @@ transactionForm.addEventListener('submit', async(e)=>{
                     }
                 });
             }
-
+            console.log("Past vs Current: "+totalPastExpense +" vs "+limitAmount + "vs" + amount);
             // Хуучин зарлагууд дэар ОДООНЫ ШИНЭ зарлагын дүнг нэмээд лимитээс давж байгааг шалгах
             if (totalPastExpense + amount > limitAmount) {
                 const currentTotal = totalPastExpense + amount;
@@ -147,6 +147,9 @@ async function fetchTransactions() {
     document.getElementById('total-income').textContent = `${totalIncome.toLocaleString()} ₮`;
     document.getElementById('total-expense').textContent = `${totalExpense.toLocaleString()} ₮`;
     renderTransactions(transactions);
+
+    // Шинэчлэгдсэн гүйлгээний жагсаалтаар тэмдэгүүдийг шалгаж олгоно
+    await checkAndAwardBadges(transactions, user, totalBalance);
 }
 
 function renderTransactions(transactions) {
@@ -324,9 +327,41 @@ async function fetchBudgets() {
         return;
     }
 
+    // Тухайн хэрэглэгчийн бүх гүйлгээг авч, төсөв тус бүрийг хэтрүүлсэн эсэхийг тооцоход ашиглана
+    const { data: allTransactions } = await supabase
+        .from('transaction')
+        .select('amount, type, category, date')
+        .eq('user_id', user.id);
+
     let htmlContent = `<h6 class="fw-bold text-dark mb-3">Одоогийн тогтоосон төсвүүд:</h6>`;
     
-    budgets.forEach(b => {
+    for (const b of budgets) {
+        // Тухайн төсвийн ангилал, сард хамаарах зарлагуудын нийлбэрийг тооцоолох
+        let spentAmount = 0;
+        if (allTransactions) {
+            allTransactions.forEach(tx => {
+                if (tx.type === 'expense' && tx.category === b.category && tx.date && tx.date.substring(0, 7) === b.month_year) {
+                    spentAmount += tx.amount;
+                }
+            });
+        }
+
+        // Хэтрүүлсэн эсэхийг шалгаж, хэрэв хэтрүүлээгүй бол "Planner" тэмдэгийг олгоно
+        const violated = spentAmount > b.limit_amount;
+        let plannerBadgeHtml = '';
+        if (!violated) {
+            const wasAwarded = await awardBadgeIfNotExists(
+                user.id,
+                `Planner:${b.category}:${b.month_year}`
+            );
+            plannerBadgeHtml = `<span class="badge bg-success-subtle text-success ms-2" title="Энэ төсвийг хэтрүүлээгүй">
+                <i class="fa-solid fa-bullseye"></i> Planner
+            </span>`;
+        }
+        else{
+            const wasRemoved = await removeBadgeIfExists(user.id,'Planner:${b.category}:${b.month_year}');
+        }
+
         htmlContent += `
             <div class="card p-2 mb-2 bg-light border-0 shadow-sm">
                 <div class="d-flex justify-content-between align-items-center">
@@ -334,12 +369,185 @@ async function fetchBudgets() {
                         <span class="fw-bold small text-dark">${b.category}</span>
                         <span class="text-muted mx-1">•</span>
                         <span class="small text-secondary">${b.month_year}</span>
+                        ${plannerBadgeHtml}
                     </div>
                     <span class="fw-bold text-primary small">${b.limit_amount.toLocaleString()} ₮</span>
                 </div>
             </div>
         `;
-    });
+    }
 
     budgetsContainer.innerHTML = htmlContent;
+}
+
+
+// BADGE LOGIC
+async function awardBadgeIfNotExists(userId, badgeName) {
+    const { data: existing, error: selectError } = await supabase
+        .from('badges')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('badge_name', badgeName)
+        .maybeSingle();
+
+    if (selectError) {
+        console.error("Тэмдэг шалгахад алдаа гарлаа:", selectError.message);
+        return false;
+    }
+
+    if (existing) {
+        return false;
+    }
+
+    const { error: insertError } = await supabase
+        .from('badges')
+        .insert([{
+            user_id: userId,
+            badge_name: badgeName,
+            awarded_at: new Date().toISOString()
+        }]);
+
+    if (insertError) {
+        console.error("Тэмдэг олгоход алдаа гарлаа:", insertError.message);
+        return false;
+    }
+
+    return true;
+}
+
+async function getUserBadges(userId) {
+    const { data, error } = await supabase
+        .from('badges')
+        .select('badge_name')
+        .eq('user_id', userId);
+
+    if (error) {
+        console.error("Тэмдэг уншихад алдаа гарлаа:", error.message);
+        return [];
+    }
+
+    return data.map(b => b.badge_name);
+}
+
+async function checkAndAwardBadges(transactions, user, totalIncome, totalExpense) {
+
+    // 1. "Banker": Нийт гүйлгээний тоо 100-аас их байх
+    if (transactions.length > 100) {
+        await awardBadgeIfNotExists(user.id, 'Banker');
+    }
+
+    // 2. "Exchange": Нийт гүйлгээний тоо 1000-аас их байх
+    if (transactions.length > 1000) {
+        await awardBadgeIfNotExists(user.id, 'Exchange');
+    }
+
+    // 3. "Money Conscious": Нийт орлого нийт зарлагаас хэтрэхгүй байх
+    if (totalBalance >= 0) {
+        await awardBadgeIfNotExists(user.id, 'Money Conscious');
+    } else {
+        await removeBadgeIfExists(user.id, 'Money Conscious');
+    }
+
+    // 4. "Consistent": Аль нэг сарын эхнээс эцэс хүртэл өдөр бүр гүйлгээ хийсэн байх
+    if (hasConsistentMonth(transactions)) {
+        await awardBadgeIfNotExists(user.id, 'Consistent');
+    }
+    await renderNavbarBadges(user.id);
+}
+
+
+function hasConsistentMonth(transactions) {
+    const monthToDays = {};
+
+    transactions.forEach(tx => {
+        if (!tx.date) return;
+        const monthYear = tx.date.substring(0, 7); // "2026-06"
+        const day = parseInt(tx.date.substring(8, 10), 10); // "11" -> 11
+
+        if (!monthToDays[monthYear]) {
+            monthToDays[monthYear] = new Set();
+        }
+        monthToDays[monthYear].add(day);
+    });
+
+
+    for (const monthYear in monthToDays) {
+        const [yearStr, monthStr] = monthYear.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10);
+
+        const daysInMonth = new Date(year, month, 0).getDate();
+
+        if (monthToDays[monthYear].size >= daysInMonth) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+async function renderNavbarBadges(userId) {
+    const badgeNames = await getUserBadges(userId);
+
+    let container = document.getElementById('navbar-badges');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'navbar-badges';
+        container.className = 'd-flex align-items-center gap-2';
+
+        const userEmailSpan = document.getElementById('user-email');
+        if (userEmailSpan && userEmailSpan.parentNode) {
+            userEmailSpan.parentNode.insertBefore(container, userEmailSpan);
+        }
+    }
+
+    let htmlContent = '';
+
+    if (badgeNames.includes('Consistent')) {
+        htmlContent += `
+            <span class="badge bg-info-subtle text-info" title="Сар бүр өдөр бүр гүйлгээ хийсэн">
+                <i class="fa-solid fa-calendar-check"></i> Consistent
+            </span>
+        `;
+    }
+
+    if (badgeNames.includes('Money Conscious')) {
+        htmlContent += `
+            <span class="badge bg-warning-subtle text-warning" title="Орлого зарлагаас хэтрээгүй">
+                <i class="fa-solid fa-piggy-bank"></i> Money Conscious
+            </span>
+        `;
+    }
+
+    if (badgeNames.includes('Banker')) {
+        htmlContent += `
+            <span class="badge bg-secondary-subtle text-secondary" title="100-аас дээш гүйлгээ хийсэн">
+                <i class="fa-solid fa-building-columns"></i> Banker
+            </span>
+        `;
+    }
+
+    if (badgeNames.includes('Exchange')) {
+        htmlContent += `
+            <span class="badge bg-dark-subtle text-dark" title="1000-аас дээш гүйлгээ хийсэн">
+                <i class="fa-solid fa-money-bill-transfer"></i> Exchange
+            </span>
+        `;
+    }
+
+    container.innerHTML = htmlContent;
+}
+async function removeBadgeIfExists(userId, badgeName) {
+    const { error } = await supabase
+        .from('badges')
+        .delete()
+        .eq('user_id', userId)
+        .eq('badge_name', badgeName);
+
+    if (error) {
+        console.error("Тэмдэг хасахад алдаа гарлаа:", error.message);
+        return false;
+    }
+
+    return true;
 }
