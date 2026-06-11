@@ -17,7 +17,7 @@
                 <button class="btn btn-sm btn-outline-primary fw-bold text-white border-primary-subtle" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasBudget">Төсөв тогтоох</button>
 
                 <span class="text-light small" id="user-email">...</span>
-                <button class = "btn btn-ouline-light btn-sm" id="btn-logout">
+                <button class = "btn btn-outline-light btn-sm" id="btn-logout">
                     <i class="bi bi-box-arrow-right"></i> Гарах
                 </button>
             </div>
@@ -27,32 +27,30 @@
 
     <div class="container-fluid px-4">
         <div class="row g-3 mb-4">
-            <div class="card border-0 shadow-sm bg-primary text-white p-3">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-primary text-white p-3">
+                    <div>
+                        <h6 class="text-white-50 text-uppercase small">Үлдэгдэл</h6>
+                        <h3 class="fw-bold mb-0" id="total-balance">0 ₮</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-primary text-white p-3">
+                    <div>
+                        <h6 class="text-white-50 text-uppercase small">Орлого</h6>
+                        <h3 class="fw-bold mb-0" id="total-income">0 ₮</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-primary text-white p-3">
                 <div>
-                    <h6 class="text-white-50 text-uppercase small">Үлдэгдэл</h6>
-                    <h3 class="fw-bold mb-0" id="total-balance">0 ₮</h3>
-                </div>
-            </div>
-        </div>
-        <div>
-        <div class="row g-3 mb-4">
-            <div class="card border-0 shadow-sm bg-primary text-white p-3">
-                <div>
-                    <h6 class="text-white-50 text-uppercase small">Орлого</h6>
-                    <h3 class="fw-bold mb-0" id="total-income">0 ₮</h3>
+                    <h6 class="text-white-50 text-uppercase small">Зарлага</h6>
+                    <h3 class="fw-bold mb-0" id="total-expense">0 ₮</h3>
                 </div>
                 </div>
             </div>
-        </div>
-        <div>
-        <div class="row g-3 mb-4">
-            <div class="card border-0 shadow-sm bg-primary text-white p-3">
-            <div>
-                <h6 class="text-white-50 text-uppercase small">Зарлага</h6>
-                <h3 class="fw-bold mb-0" id="total-expense">0 ₮</h3>
-            </div>
-            </div>
-        </div>
         </div>
     
 

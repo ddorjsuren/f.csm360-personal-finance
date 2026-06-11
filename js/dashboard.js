@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await fetchTransactions(); 
     await fetchBudgets();
+    await fetchBadges();
 });
 
 transactionForm.addEventListener('submit', async(e)=>{
@@ -150,6 +151,7 @@ async function fetchTransactions() {
 
     // Шинэчлэгдсэн гүйлгээний жагсаалтаар тэмдэгүүдийг шалгаж олгоно
     await checkAndAwardBadges(transactions, user, totalBalance);
+    await fetchBudgets();
 }
 
 function renderTransactions(transactions) {
@@ -359,7 +361,7 @@ async function fetchBudgets() {
             </span>`;
         }
         else{
-            const wasRemoved = await removeBadgeIfExists(user.id,'Planner:${b.category}:${b.month_year}');
+            const wasRemoved = await removeBadgeIfExists(user.id, `Planner:${b.category}:${b.month_year}`);
         }
 
         htmlContent += `
@@ -415,7 +417,7 @@ async function awardBadgeIfNotExists(userId, badgeName) {
     return true;
 }
 
-async function getUserBadges(userId) {
+async function fetchBadges(userId) {
     const { data, error } = await supabase
         .from('badges')
         .select('badge_name')
@@ -429,7 +431,7 @@ async function getUserBadges(userId) {
     return data.map(b => b.badge_name);
 }
 
-async function checkAndAwardBadges(transactions, user, totalIncome, totalExpense) {
+async function checkAndAwardBadges(transactions, user, totalBalance) {
 
     // 1. "Banker": Нийт гүйлгээний тоо 100-аас их байх
     if (transactions.length > 100) {
@@ -487,7 +489,7 @@ function hasConsistentMonth(transactions) {
 }
 
 async function renderNavbarBadges(userId) {
-    const badgeNames = await getUserBadges(userId);
+    const badgeNames = await fetchBadges(userId);
 
     let container = document.getElementById('navbar-badges');
     if (!container) {
